@@ -7,9 +7,11 @@ import string_matcher.core.RecordWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class CsvRecordWriter implements RecordWriter {
     private final String outputPath;
+    private static final int MAX_CLUSTER_SIZE = 50;
 
     public CsvRecordWriter(String outputPath) {
         this.outputPath = outputPath;
@@ -22,6 +24,16 @@ public class CsvRecordWriter implements RecordWriter {
             
             int clusterId = 1;
             for (List<Record> cluster : clusters) {
+                if (cluster.size() > MAX_CLUSTER_SIZE) {
+                    System.err.println("WARN: Cluster of size " + cluster.size() + " detected and excluded from output. " +
+                            "Sample members: " + cluster.stream().limit(3)
+                            .map(Record::originalString)
+                            .collect(Collectors.joining(" | ")) +
+                            ". This likely indicates a false merge caused by shared suffixes " +
+                            "or an overly loose similarity threshold.");
+                    continue;
+                }
+
                 // We only care about clusters that have duplicates (size > 1)
                 if (cluster.size() > 1) {
                     for (Record record : cluster) {

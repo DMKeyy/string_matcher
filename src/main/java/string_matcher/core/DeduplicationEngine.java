@@ -53,7 +53,7 @@ public class DeduplicationEngine {
                             int len2 = candidate.normalizedString().length();
                             if (len1 > 0 && len2 > 0) {
                                 double lengthRatio = (double) Math.min(len1, len2) / Math.max(len1, len2);
-                                if (lengthRatio < 0.4) {
+                                if (lengthRatio < 0.5) {
                                     continue;
                                 }
                             }
