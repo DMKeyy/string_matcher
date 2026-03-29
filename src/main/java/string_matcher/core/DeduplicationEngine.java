@@ -39,7 +39,7 @@ public class DeduplicationEngine {
         int availableProcessors = Runtime.getRuntime().availableProcessors(); int threadsToUse = Math.max(1, availableProcessors - 2); System.out.println("Using " + threadsToUse + " threads."); ForkJoinPool customThreadPool = new ForkJoinPool(threadsToUse); try { customThreadPool.submit(() -> { records.parallelStream().forEach(record -> {
             try {
                 // Build a larger list to prevent truncation of identical names
-                List<Record> candidates = index.findCandidates(record, 150);
+                List<Record> candidates = index.findCandidates(record, 100);
                 
                 for (Record candidate : candidates) {
                     // UnionFind is idempotent, so we can let both A->B and B->A be checked.
@@ -78,3 +78,4 @@ public class DeduplicationEngine {
         System.out.println("Total time: " + (totalTime / 1000.0) + " sec");
     }
 }
+
