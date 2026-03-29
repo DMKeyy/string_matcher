@@ -1,10 +1,11 @@
 package string_matcher.infrastructure;
 
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.core.KeywordAnalyzer;
 import org.apache.lucene.analysis.ngram.NGramTokenFilter;
-import org.apache.lucene.analysis.Analyzer.TokenStreamComponents;
 import org.apache.lucene.analysis.core.WhitespaceTokenizer;
+import org.apache.lucene.document.NumericDocValuesField;
+import org.apache.lucene.index.NumericDocValues;
+import org.apache.lucene.index.MultiDocValues;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StringField;
@@ -28,12 +29,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.lucene.util.QueryBuilder;
+import org.apache.lucene.search.BooleanClause;
+
 public class LuceneCandidateGenerator implements CandidateGenerator {
     private Directory directory;
     private final Analyzer analyzer;
     private IndexReader reader;
     private IndexSearcher searcher;
     private Map<Integer, Record> recordMap;
+    private final ThreadLocal<QueryBuilder> queryBuilderLocal;
 
     public LuceneCandidateGenerator() {
         this.analyzer = new Analyzer() {
@@ -44,6 +49,7 @@ public class LuceneCandidateGenerator implements CandidateGenerator {
                 return new TokenStreamComponents(src, filter);
             }
         };
+        this.queryBuilderLocal = ThreadLocal.withInitial(() -> new QueryBuilder(analyzer));
     }
 
     @Override
@@ -73,15 +79,15 @@ public class LuceneCandidateGenerator implements CandidateGenerator {
             return new ArrayList<>();
         }
         
-        // Escape special lucene characters
-        String escaped = QueryParser.escape(queryRecord.normalizedString());
+        QueryBuilder builder = queryBuilderLocal.get();
+        Query query = builder.createBooleanQuery("normalized", queryRecord.normalizedString(), BooleanClause.Occur.SHOULD);
         
-        QueryParser parser = new QueryParser("normalized", analyzer);
-        parser.setDefaultOperator(QueryParser.Operator.OR);
-        Query query = parser.parse(escaped);
+        if (query == null) {
+            return new ArrayList<>();
+        }
         
         TopDocs topDocs = searcher.search(query, maxCandidates);
-        List<Record> candidates = new ArrayList<>();
+        List<Record> candidates = new ArrayList<>(topDocs.scoreDocs.length);
         
         for (ScoreDoc scoreDoc : topDocs.scoreDocs) {
             Document doc = searcher.storedFields().document(scoreDoc.doc);

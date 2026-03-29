@@ -6,7 +6,7 @@ import string_matcher.core.SimilarityMetric;
 
 public class CombinedSimilarityMetric implements SimilarityMetric {
     private final JaroWinklerSimilarity jaroWinkler = new JaroWinklerSimilarity();
-    private final LevenshteinDistance levenshtein = new LevenshteinDistance();
+    private final LevenshteinDistance levenshtein;
     
     private final double jaroWinklerThreshold;
     private final int maxLevenshteinDistance;
@@ -14,6 +14,7 @@ public class CombinedSimilarityMetric implements SimilarityMetric {
     public CombinedSimilarityMetric(double jaroWinklerThreshold, int maxLevenshteinDistance) {
         this.jaroWinklerThreshold = jaroWinklerThreshold;
         this.maxLevenshteinDistance = maxLevenshteinDistance;
+        this.levenshtein = new LevenshteinDistance(maxLevenshteinDistance);
     }
 
     @Override
@@ -24,17 +25,19 @@ public class CombinedSimilarityMetric implements SimilarityMetric {
 
     @Override
     public boolean isMatch(String s1, String s2) {
+        if (s1 == s2) return true;
         if (s1 == null || s2 == null) return false;
+        
+        double similarity = jaroWinkler.apply(s1, s2);
+        if (similarity >= jaroWinklerThreshold) {
+            return true;
+        }
+        
         if (Math.abs(s1.length() - s2.length()) > maxLevenshteinDistance) {
             return false;
         }
         
-        int distance = levenshtein.apply(s1, s2);
-        if (distance <= maxLevenshteinDistance) {
-            return true;
-        }
-        
-        double similarity = jaroWinkler.apply(s1, s2);
-        return similarity >= jaroWinklerThreshold;
+        Integer distance = levenshtein.apply(s1, s2);
+        return distance != null && distance >= 0 && distance <= maxLevenshteinDistance;
     }
 }
