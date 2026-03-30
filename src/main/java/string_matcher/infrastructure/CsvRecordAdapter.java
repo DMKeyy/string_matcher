@@ -28,7 +28,6 @@ public class CsvRecordAdapter implements RecordReader {
             int id = 0;
             while ((line = reader.readNext()) != null) {
                 if (line.length > 0) {
-                    // Rejoin the line elements in case the unquoted string contained commas
                     String original = String.join(",", line);
                     String normalized = normalizer.normalize(original);
                     records.add(new Record(id++, original, normalized));

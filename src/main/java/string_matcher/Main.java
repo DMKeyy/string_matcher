@@ -14,20 +14,16 @@ public class Main {
         try {
             Scanner scanner = new Scanner(System.in);
             
-            // Default configuration
             String inputPath = "data/companyNamesLarge.csv";
             String outputPath = "data/clustered_companies.csv";
-            double threshold = 0.92;
-            double maxDistance = 0.28;
-            int maxClusterSize = 50;
+            double threshold = 0.98;
+            int maxClusterSize = 30;
 
-            // Interactive configuration loop
             while (true) {
                 System.out.println("\n=== String Matcher Configuration ===");
                 System.out.println("  Input Path       : " + inputPath);
                 System.out.println("  Output Path      : " + outputPath);
                 System.out.println("  Threshold        : " + threshold);
-                System.out.println("  Max Distance     : " + maxDistance);
                 System.out.println("  Max Cluster Size : " + maxClusterSize);
                 System.out.println("====================================");
                 System.out.println("1. Customize settings");
@@ -48,10 +44,6 @@ public class Main {
                     String th = scanner.nextLine().trim();
                     if (!th.isEmpty()) threshold = Double.parseDouble(th);
 
-                    System.out.print("Enter Max relative Distance (e.g., 0.25) [" + maxDistance + "]: ");
-                    String md = scanner.nextLine().trim();
-                    if (!md.isEmpty()) maxDistance = Double.parseDouble(md);
-
                     System.out.print("Enter Max Cluster Size [" + maxClusterSize + "]: ");
                     String ms = scanner.nextLine().trim();
                     if (!ms.isEmpty()) maxClusterSize = Integer.parseInt(ms);
@@ -64,16 +56,14 @@ public class Main {
             }
 
             System.out.println("\nStarting Deduplication against: " + inputPath);
-            System.out.println(String.format("Settings: Threshold=%.2f, MaxDistance=%.2f, MaxClusterSize=%d", threshold, maxDistance, maxClusterSize));
+            System.out.println(String.format("Settings: Threshold=%.2f, MaxClusterSize=%d", threshold, maxClusterSize));
 
-            // Dependency Injection (Wiring)
             StringNormalizer normalizer = new BusinessEntityNormalizer();
             RecordReader reader = new CsvRecordAdapter(inputPath, normalizer);
             RecordWriter writer = new CsvRecordWriter(outputPath);
             CandidateGenerator index = new LuceneCandidateGenerator();
 
-            // Apply configured settings
-            SimilarityMetric metric = new CombinedSimilarityMetric(threshold, maxDistance);
+            SimilarityMetric metric = new CombinedSimilarityMetric(threshold);
             ClusteringStrategy clusterer = new UnionFindClustering(maxClusterSize, metric);
 
             DeduplicationEngine engine = new DeduplicationEngine(reader, writer, index, metric, clusterer);

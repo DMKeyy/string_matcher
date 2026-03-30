@@ -48,7 +48,6 @@ public class DeduplicationEngine {
                         List<Record> candidates = index.findCandidates(record, 100);
 
                         for (Record candidate : candidates) {
-                            // Length-ratio pre-filter: skip obviously dissimilar pairs
                             int len1 = record.normalizedString().length();
                             int len2 = candidate.normalizedString().length();
                             if (len1 > 0 && len2 > 0) {
@@ -59,7 +58,6 @@ public class DeduplicationEngine {
                             }
 
                             if (metric.isMatch(record.normalizedString(), candidate.normalizedString())) {
-                                // ClusteringStrategy handles its own thread safety
                                 strategy.addMatch(record, candidate);
                             }
                         }

@@ -34,7 +34,6 @@ public class CsvRecordWriter implements RecordWriter {
                     continue;
                 }
 
-                // We only care about clusters that have duplicates (size > 1)
                 if (cluster.size() > 1) {
                     for (Record record : cluster) {
                         writer.writeNext(new String[]{String.valueOf(clusterId), record.originalString()});

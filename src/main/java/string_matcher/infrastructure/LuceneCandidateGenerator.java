@@ -90,7 +90,6 @@ public class LuceneCandidateGenerator implements CandidateGenerator {
         TopDocs topDocs = searcher.search(query, maxCandidates);
         List<Record> candidates = new ArrayList<>(topDocs.scoreDocs.length);
 
-        // Use per-thread StoredFields to avoid thread-safety issues
         StoredFields fields = storedFieldsLocal.get();
         if (fields == null) {
             fields = searcher.storedFields();

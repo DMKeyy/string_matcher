@@ -8,14 +8,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
-/**
- * Union-Find clustering with:
- * <ul>
- *   <li>Maximum cluster size cap — prevents runaway transitive merging (mega-clusters)</li>
- *   <li>Iterative refinement pass — re-evaluates every member against the cluster centroid
- *       and ejects weak members into singleton clusters</li>
- * </ul>
- */
 public class UnionFindClustering implements ClusteringStrategy {
     private final ConcurrentHashMap<Integer, Integer> parent = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Integer, Integer> rank = new ConcurrentHashMap<>();
@@ -25,16 +17,9 @@ public class UnionFindClustering implements ClusteringStrategy {
     private final int maxClusterSize;
     private final SimilarityMetric metric;
 
-    // Stripe locks for fine-grained concurrency (avoid a single global lock)
     private static final int LOCK_STRIPES = 64;
     private final ReentrantLock[] locks = new ReentrantLock[LOCK_STRIPES];
 
-    /**
-     * @param maxClusterSize maximum number of records allowed in a single cluster.
-     *                       Unions that would exceed this limit are silently rejected.
-     * @param metric         the similarity metric used during the refinement pass to
-     *                       re-evaluate cluster members against the centroid.
-     */
     public UnionFindClustering(int maxClusterSize, SimilarityMetric metric) {
         this.maxClusterSize = maxClusterSize;
         this.metric = metric;
@@ -54,11 +39,7 @@ public class UnionFindClustering implements ClusteringStrategy {
         recordMap.putIfAbsent(r.id(), r);
     }
 
-    /**
-     * Iterative find with path compression — prevents stack overflow on large datasets.
-     */
     private int find(int i) {
-        // Walk up to root
         int current = i;
         while (true) {
             Integer p = parent.get(current);
@@ -69,7 +50,6 @@ public class UnionFindClustering implements ClusteringStrategy {
         }
         int root = current;
 
-        // Path compression: point all nodes on the path directly to root
         current = i;
         while (current != root) {
             Integer next = parent.get(current);
@@ -85,11 +65,12 @@ public class UnionFindClustering implements ClusteringStrategy {
         addRecord(r1);
         addRecord(r2);
 
-        // Acquire locks in consistent order to prevent deadlocks
         int id1 = r1.id();
         int id2 = r2.id();
-        ReentrantLock lock1 = lockFor(Math.min(id1, id2));
-        ReentrantLock lock2 = lockFor(Math.max(id1, id2));
+        int stripe1 = Math.abs(id1 % LOCK_STRIPES);
+        int stripe2 = Math.abs(id2 % LOCK_STRIPES);
+        ReentrantLock lock1 = locks[Math.min(stripe1, stripe2)];
+        ReentrantLock lock2 = locks[Math.max(stripe1, stripe2)];
 
         lock1.lock();
         try {
@@ -101,14 +82,12 @@ public class UnionFindClustering implements ClusteringStrategy {
                 int root2 = find(id2);
 
                 if (root1 != root2) {
-                    // --- Cluster size cap: reject the union if the merged set is too large ---
                     int size1 = size.getOrDefault(root1, 1);
                     int size2 = size.getOrDefault(root2, 1);
                     if (size1 + size2 > maxClusterSize) {
-                        return; // silently skip — prevents mega-cluster growth
+                        return;
                     }
 
-                    // Union by rank for balanced trees
                     int rank1 = rank.getOrDefault(root1, 0);
                     int rank2 = rank.getOrDefault(root2, 0);
                     if (rank1 < rank2) {
@@ -135,19 +114,16 @@ public class UnionFindClustering implements ClusteringStrategy {
 
     @Override
     public List<List<Record>> getClusters() {
-        // ---- Phase 1: collect raw clusters from Union-Find ----
         Map<Integer, List<Record>> rawClusters = new HashMap<>();
         for (int id : parent.keySet()) {
             int root = find(id);
             rawClusters.computeIfAbsent(root, k -> new ArrayList<>()).add(recordMap.get(id));
         }
 
-        // ---- Phase 2: iterative refinement — eject weak members ----
         List<List<Record>> refined = new ArrayList<>();
 
         for (List<Record> cluster : rawClusters.values()) {
             if (cluster.size() <= 2) {
-                // Tiny clusters don't need refinement
                 refined.add(cluster);
                 continue;
             }
@@ -158,18 +134,9 @@ public class UnionFindClustering implements ClusteringStrategy {
         return refined;
     }
 
-    /**
-     * Refines a single cluster by:
-     * <ol>
-     *   <li>Computing a centroid (the member with highest average similarity to all others)</li>
-     *   <li>Ejecting any member that doesn't match the centroid according to the metric</li>
-     * </ol>
-     * Ejected members become singletons.
-     */
     private List<List<Record>> refineCluster(List<Record> cluster) {
         List<List<Record>> result = new ArrayList<>();
 
-        // Find the centroid: the record with the highest average similarity to all others
         Record centroid = findCentroid(cluster);
 
         List<Record> kept = new ArrayList<>();
@@ -190,7 +157,6 @@ public class UnionFindClustering implements ClusteringStrategy {
 
         result.add(kept);
 
-        // Each ejected record becomes its own singleton cluster
         for (Record r : ejected) {
             result.add(List.of(r));
         }
@@ -198,9 +164,6 @@ public class UnionFindClustering implements ClusteringStrategy {
         return result;
     }
 
-    /**
-     * Selects the cluster member with the highest average similarity to every other member.
-     */
     private Record findCentroid(List<Record> cluster) {
         Record best = cluster.get(0);
         double bestAvg = -1;
