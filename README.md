@@ -53,6 +53,27 @@ src/main/java/string_matcher/
 mvn clean package
 ```
 
+## Create Executable JAR
+
+This project is configured to build a runnable fat JAR (includes all dependencies).
+
+From the project root:
+
+```bash
+mvn clean package
+```
+
+Generated artifacts in `target/`:
+
+- `stringmatcher-1.0-SNAPSHOT-exe.jar` (executable, includes dependencies)
+- `stringmatcher-1.0-SNAPSHOT.jar` (regular project JAR)
+
+Run the executable JAR:
+
+```bash
+java -jar target/stringmatcher-1.0-SNAPSHOT-exe.jar
+```
+
 ## Run In Terminal
 
 ### Windows PowerShell
